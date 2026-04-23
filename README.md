@@ -2,6 +2,23 @@
 
 Canadian TSX stock prediction routine. Generates buy signals using technical strategies, delivers to Discord, tracks performance in SQLite. Manual execution for now; designed to evolve into a full trading agent.
 
+## Environment setup
+
+Copy `.env.example` to `.env` and fill in values:
+
+```powershell
+copy .env.example .env
+```
+
+| Variable              | Required | Description                                                                                                   |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `DISCORD_WEBHOOK_URL` | Yes      | Webhook for signal delivery. Create at **Server Settings → Integrations → Webhooks → New Webhook**, copy URL. |
+| `FMP_API_KEY`         | No       | Financial Modeling Prep key (Phase 2, paid). Leave blank.                                                     |
+| `EODHD_API_KEY`       | No       | EODHD key (Phase 2, paid). Leave blank.                                                                       |
+| `ENABLE_LIVE_TRADING` | No       | Set `1` only when switching to IBKR live broker. Default `0`.                                                 |
+
+Without `DISCORD_WEBHOOK_URL` the system runs but signals are logged only (no Discord messages sent).
+
 ## Quick start
 
 ```powershell
@@ -10,7 +27,7 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -e ".[backtest,dev]"
 
-# 2. Configure secrets
+# 2. Configure secrets (see Environment setup above)
 copy .env.example .env
 # Edit .env, set DISCORD_WEBHOOK_URL
 
