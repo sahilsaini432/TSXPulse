@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stock-predictor"
+version = "0.1.0"
+description = "Canadian TSX stock prediction routine with Discord signal delivery"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "yfinance>=0.2.40",
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+    "pandas_market_calendars>=4.4.0",
+    "SQLAlchemy>=2.0.30",
+    "pydantic>=2.6.0",
+    "python-dotenv>=1.0.1",
+    "discord-webhook>=1.3.1",
+    "requests>=2.31.0",
+    "PyYAML>=6.0.1",
+    "tenacity>=8.2.3",
+    "pyarrow>=15.0.0",
+]
+
+[project.optional-dependencies]
+backtest = [
+    "matplotlib>=3.8.0",
+]
+dashboard = [
+    "streamlit>=1.30.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.3.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

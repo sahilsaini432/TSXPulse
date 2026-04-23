@@ -1,0 +1,66 @@
+data:
+  provider: yfinance          # yfinance | fmp | eodhd
+  cache_ttl_minutes: 15
+  lookback_days: 250
+  retry_attempts: 3
+  retry_backoff_seconds: [2, 4, 8]
+
+account:
+  capital: 25000              # CAD
+  currency: CAD
+
+watchlist:
+  - RY.TO
+  - TD.TO
+  - BNS.TO
+  - BMO.TO
+  - CM.TO
+  - ENB.TO
+  - CNQ.TO
+  - SU.TO
+  - BCE.TO
+  - T.TO
+  - CNR.TO
+  - CP.TO
+  - XIU.TO
+  - XIC.TO
+  - ZEB.TO
+
+strategies:
+  mean_reversion:
+    enabled: true
+    rsi_period: 14
+    rsi_buy_below: 30
+    rsi_sell_above: 70
+  ma_crossover:
+    enabled: true
+    short_period: 50
+    long_period: 200
+    etfs_only: true
+
+risk:
+  max_risk_per_trade_pct: 0.02       # 2% of capital per trade
+  max_concurrent_positions: 3
+  max_signals_per_day: 3
+  stop_loss_pct: 0.05
+  take_profit_pct: 0.10
+  max_daily_implied_loss_pct: 0.05
+
+schedule:
+  runs_et: ["09:15", "12:00", "15:45"]
+  timezone: America/Toronto
+  respect_tsx_holidays: true
+
+broker:
+  mode: paper                 # manual | paper | ibkr
+  paper_slippage_pct: 0.001
+
+discord:
+  enabled: true
+  webhook_url_env: DISCORD_WEBHOOK_URL
+
+logging:
+  level: INFO
+  file: logs/runner.log
+  max_bytes: 5242880          # 5 MB
+  backup_count: 5

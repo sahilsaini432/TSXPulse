@@ -1,0 +1,38 @@
+# Secrets
+.env
+.env.local
+/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# App data
+data/cache/
+data/*.db
+data/*.db-journal
+data/backtest_results/*.png
+data/backtest_results/*.csv
+logs/*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+claude_cache/
+CLAUDE.md
