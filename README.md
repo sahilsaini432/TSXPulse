@@ -145,6 +145,15 @@ Raw trade logs in `data/backtest_results/`.
 4. Max daily implied loss 5% of capital
 5. Dedup: no new signal if ticker already has open position
 
-## Disclaimer
+## ⚠️ DISCLAIMER — READ BEFORE USE
 
-Not financial advice. Historical backtest performance does not predict future results. Losses are real. Use paper mode for at least two weeks before real capital.
+> **This software is not financial advice. It is an experimental, algorithmic signal generator built for educational and research purposes only.**
+
+- **No guarantee of profit.** All signals are based on technical indicators and historical patterns. Past performance does not predict future results. Markets can and do move against any model.
+- **You can lose money.** Trading stocks involves substantial risk of loss. You may lose part or all of your invested capital.
+- **We are not responsible for your losses.** The authors and contributors of this project accept no liability whatsoever for any financial losses, damages, or other consequences arising from use of this software — direct, indirect, or incidental.
+- **No licensed financial advice.** Nothing in this codebase, its output, or its documentation constitutes investment advice, a solicitation to buy or sell securities, or a recommendation of any kind.
+- **You are solely responsible** for all trading decisions. Always do your own research. Consult a licensed financial advisor before putting real capital at risk.
+- **Paper trade first.** Run in `paper` mode for a minimum of two weeks and pass the gate check (`python scripts/stats.py --gate`) before considering real money.
+
+By using this software you acknowledge and accept all of the above.
