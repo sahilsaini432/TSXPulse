@@ -1,12 +1,12 @@
 data:
-  provider: yfinance          # yfinance | fmp | eodhd
+  provider: yfinance # yfinance | fmp | eodhd
   cache_ttl_minutes: 15
   lookback_days: 250
   retry_attempts: 3
   retry_backoff_seconds: [2, 4, 8]
 
 account:
-  capital: 25000              # CAD
+  capital: 25000 # CAD
   currency: CAD
 
 watchlist:
@@ -39,7 +39,7 @@ strategies:
     etfs_only: true
 
 risk:
-  max_risk_per_trade_pct: 0.02       # 2% of capital per trade
+  max_risk_per_trade_pct: 0.02 # 2% of capital per trade
   max_concurrent_positions: 3
   max_signals_per_day: 3
   stop_loss_pct: 0.05
@@ -52,7 +52,7 @@ schedule:
   respect_tsx_holidays: true
 
 broker:
-  mode: paper                 # manual | paper | ibkr
+  mode: paper # manual | paper | ibkr
   paper_slippage_pct: 0.001
 
 discord:
@@ -62,5 +62,20 @@ discord:
 logging:
   level: INFO
   file: logs/runner.log
-  max_bytes: 5242880          # 5 MB
+  max_bytes: 5242880 # 5 MB
   backup_count: 5
+
+discovery:
+  # LLM-driven TSX Composite discovery pipeline. Parallel to strategies — runs
+  # via scripts/run_discovery.py, NOT via run_cycle.py. Set enabled: true after
+  # populating ANTHROPIC_API_KEY and TAVILY_API_KEY in .env.
+  enabled: false
+  model: claude-sonnet-4-6 # or claude-opus-4-7 (slower, higher quality)
+  max_universe: 225 # how many tickers to fetch from XIC holdings
+  max_candidates: 50 # top-N from screener forwarded to ranker
+  top_n: 7 # final signals returned by ranker
+  max_tokens: 4000 # model response token budget
+  news_per_ticker: 3 # Tavily results per candidate
+  news_days_back: 7 # how recent news must be
+  api_key_env: ANTHROPIC_API_KEY
+  tavily_key_env: TAVILY_API_KEY

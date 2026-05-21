@@ -29,7 +29,7 @@ class Signal(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticker = Column(String(16), index=True, nullable=False)
     strategy = Column(String(64), index=True, nullable=False)
-    action = Column(String(8), nullable=False)                # BUY | SELL | HOLD
+    action = Column(String(8), nullable=False)  # BUY | SELL | HOLD
     entry_price = Column(Float, nullable=False)
     target_price = Column(Float, nullable=False)
     stop_loss = Column(Float, nullable=False)
@@ -47,7 +47,7 @@ class Fill(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     signal_id = Column(Integer, ForeignKey("signals.id"), nullable=False, index=True)
-    broker_mode = Column(String(16), nullable=False)             # manual|paper|ibkr
+    broker_mode = Column(String(16), nullable=False)  # manual|paper|ibkr
     fill_price = Column(Float, nullable=False)
     qty = Column(Integer, nullable=False)
     filled_at = Column(DateTime, nullable=False, default=utcnow)
@@ -89,8 +89,38 @@ class HealthLog(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     ts = Column(DateTime, nullable=False, default=utcnow, index=True)
     component = Column(String(64), nullable=False, index=True)
-    status = Column(String(16), nullable=False)                  # ok|warn|error
+    status = Column(String(16), nullable=False)  # ok|warn|error
     message = Column(Text, nullable=False, default="")
+
+
+class DiscoverySignal(Base):
+    """LLM-ranked TSX Composite signals from the discovery pipeline.
+
+    Distinct from `Signal` (strategy-based) because (a) it has different fields
+    (entry zone vs single entry price, no strategy name, model attribution,
+    catalyst summary), and (b) it carries different semantics — these are
+    read-only suggestions for manual review, not candidates for the risk gate
+    or paper broker.
+    """
+
+    __tablename__ = "discovery_signals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker = Column(String(16), index=True, nullable=False)
+    rank = Column(Integer, nullable=False)  # 1 = top pick of this cycle
+    confidence = Column(Float, nullable=False)  # 0.0-1.0 from the LLM
+    entry_low = Column(Float, nullable=False)
+    entry_high = Column(Float, nullable=False)
+    stop = Column(Float, nullable=False)
+    target = Column(Float, nullable=False)
+    rationale = Column(Text, nullable=False, default="")
+    catalyst_summary = Column(Text, nullable=False, default="")
+    raw_score = Column(Integer, nullable=False, default=0)  # screener score
+    model = Column(String(64), nullable=False)  # e.g. claude-sonnet-4-6
+    universe_source = Column(String(32), nullable=False)  # xic_csv|cache|fallback
+    cycle_id = Column(String(32), nullable=False, index=True)  # groups one run's signals
+    generated_at = Column(DateTime, nullable=False, default=utcnow, index=True)
+    status = Column(String(16), nullable=False, default="new")  # new|expired (manual track only)
 
 
 def get_engine(db_path: Path | str):
@@ -103,5 +133,6 @@ def get_session_factory(db_path: Path | str):
 
 
 def init_db(db_path: Path | str) -> None:
+    """Create all tables. Idempotent — SQLAlchemy skips existing tables."""
     engine = get_engine(db_path)
     Base.metadata.create_all(engine)

@@ -8,7 +8,6 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "config.yaml"
 DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
@@ -86,6 +85,21 @@ class LoggingConfig(BaseModel):
     backup_count: int = 5
 
 
+class DiscoveryConfig(BaseModel):
+    """LLM-driven TSX Composite discovery pipeline (parallel to strategies)."""
+
+    enabled: bool = False
+    model: str = "claude-sonnet-4-6"
+    max_universe: int = Field(225, ge=10, le=300)  # cap on tickers to fetch from universe
+    max_candidates: int = Field(50, ge=5, le=100)  # top-N from screener that go to ranker
+    top_n: int = Field(7, ge=1, le=20)  # final signals returned by ranker
+    max_tokens: int = Field(4000, ge=1000, le=16000)  # model response budget
+    news_per_ticker: int = Field(3, ge=1, le=10)
+    news_days_back: int = Field(7, ge=1, le=30)
+    api_key_env: str = "ANTHROPIC_API_KEY"
+    tavily_key_env: str = "TAVILY_API_KEY"
+
+
 class AppConfig(BaseModel):
     data: DataConfig = DataConfig()
     account: AccountConfig = AccountConfig()
@@ -96,6 +110,7 @@ class AppConfig(BaseModel):
     broker: BrokerConfig = BrokerConfig()
     discord: DiscordConfig = DiscordConfig()
     logging: LoggingConfig = LoggingConfig()
+    discovery: DiscoveryConfig = DiscoveryConfig()
 
     @field_validator("watchlist")
     @classmethod

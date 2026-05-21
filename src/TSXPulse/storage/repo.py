@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from TSXPulse.timeutil import utcnow
 from TSXPulse.storage.models import (
     DailyPerformance,
+    DiscoverySignal,
     Fill,
     HealthLog,
     Position,
@@ -69,3 +70,23 @@ def upsert_daily_performance(session: Session, perf: DailyPerformance) -> None:
     else:
         session.add(perf)
     session.commit()
+
+
+def save_discovery_signal(session: Session, sig: DiscoverySignal) -> DiscoverySignal:
+    session.add(sig)
+    session.commit()
+    session.refresh(sig)
+    return sig
+
+
+def latest_discovery_cycle(session: Session) -> Sequence[DiscoverySignal]:
+    """Return all signals from the most recent discovery cycle, ordered by rank."""
+    latest_cycle = session.scalar(
+        select(DiscoverySignal.cycle_id).order_by(DiscoverySignal.generated_at.desc()).limit(1)
+    )
+    if latest_cycle is None:
+        return []
+    stmt = (
+        select(DiscoverySignal).where(DiscoverySignal.cycle_id == latest_cycle).order_by(DiscoverySignal.rank)
+    )
+    return session.scalars(stmt).all()

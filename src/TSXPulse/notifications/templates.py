@@ -5,12 +5,12 @@ from discord_webhook import DiscordEmbed
 from TSXPulse.strategies.base import Signal
 from TSXPulse.timeutil import utcnow
 
-
-COLOR_BUY = "00C853"          # green
-COLOR_TARGET = "2979FF"       # blue
-COLOR_STOP = "D32F2F"         # red
-COLOR_SUMMARY = "FFFFFF"      # white
-COLOR_HEALTH = "FF9100"       # orange
+COLOR_BUY = "00C853"  # green
+COLOR_TARGET = "2979FF"  # blue
+COLOR_STOP = "D32F2F"  # red
+COLOR_SUMMARY = "FFFFFF"  # white
+COLOR_HEALTH = "FF9100"  # orange
+COLOR_DISCOVERY = "9C27B0"  # purple — visually distinct from strategy signals
 
 
 def _now_utc() -> str:
@@ -27,7 +27,9 @@ def buy_embed(signal: Signal, qty: int, broker_mode: str) -> DiscordEmbed:
         color=COLOR_BUY,
     )
     embed.add_embed_field(name="Entry", value=f"${signal.entry_price:,.2f}", inline=True)
-    embed.add_embed_field(name="Target", value=f"${signal.target_price:,.2f} ({target_pct:+.1f}%)", inline=True)
+    embed.add_embed_field(
+        name="Target", value=f"${signal.target_price:,.2f} ({target_pct:+.1f}%)", inline=True
+    )
     embed.add_embed_field(name="Stop", value=f"${signal.stop_loss:,.2f} ({stop_pct:+.1f}%)", inline=True)
     embed.add_embed_field(name="Qty", value=f"{qty}", inline=True)
     embed.add_embed_field(name="Est. Cost", value=f"${est_cost:,.0f}", inline=True)
@@ -36,9 +38,7 @@ def buy_embed(signal: Signal, qty: int, broker_mode: str) -> DiscordEmbed:
     embed.add_embed_field(name="Session (UTC)", value=_now_utc(), inline=True)
     embed.add_embed_field(name="Mode", value=broker_mode, inline=True)
     footer = (
-        "Execute manually in your broker."
-        if broker_mode == "manual"
-        else f"Simulated fill ({broker_mode})."
+        "Execute manually in your broker." if broker_mode == "manual" else f"Simulated fill ({broker_mode})."
     )
     embed.set_footer(text=footer)
     return embed
@@ -105,4 +105,43 @@ def health_alert_embed(component: str, status: str, message: str) -> DiscordEmbe
         color=COLOR_HEALTH,
     )
     embed.set_footer(text=_now_utc())
+    return embed
+
+
+def discovery_summary_embed(
+    signals: list,
+    model: str,
+    universe_size: int,
+    screened: int,
+) -> DiscordEmbed:
+    """One compact embed listing all ranked discovery signals.
+
+    `signals` is a list[RankedSignal] but is typed as list to avoid a circular
+    import (discovery -> notifications -> discovery).
+    """
+    embed = DiscordEmbed(
+        title=f"TSX Discovery — Top {len(signals)} Setups",
+        description=(
+            f"Screened {screened} of {universe_size} TSX Composite names. "
+            f"Ranked by {model}. **For manual review only — not trade instructions.**"
+        ),
+        color=COLOR_DISCOVERY,
+    )
+
+    for sig in signals:
+        entry_range = f"${sig.entry_low:.2f} – ${sig.entry_high:.2f}"
+        r_to_target = sig.target - ((sig.entry_low + sig.entry_high) / 2)
+        r_to_stop = ((sig.entry_low + sig.entry_high) / 2) - sig.stop
+        rr = r_to_target / r_to_stop if r_to_stop > 0 else 0.0
+        catalyst = f"\n  • Catalyst: {sig.catalyst_summary}" if sig.catalyst_summary else ""
+        # Discord limits: each field value max 1024 chars; description 4096; embed total 6000
+        value = (
+            f"Entry **{entry_range}** | Stop **${sig.stop:.2f}** | "
+            f"Target **${sig.target:.2f}** (R:R {rr:.1f})\n"
+            f"Confidence **{sig.confidence:.0%}**\n"
+            f"_{sig.rationale}_{catalyst}"
+        )[:1024]
+        embed.add_embed_field(name=f"#{sig.rank}  {sig.ticker}", value=value, inline=False)
+
+    embed.set_footer(text=f"Discovery • {_now_utc()}")
     return embed

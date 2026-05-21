@@ -45,7 +45,7 @@ python scripts/force_signal_test.py
 
 # 7. One orchestrator cycle (respects TSX calendar)
 python scripts/run_cycle.py
-
+****
 # 8. EOD reconcile (close target/stop hits, write daily summary)
 python scripts/reconcile_eod.py
 
