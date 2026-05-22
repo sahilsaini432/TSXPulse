@@ -1,20 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
 import pandas as pd
 
 
 OHLCV_COLUMNS = ["open", "high", "low", "close", "volume"]
-
-
-@dataclass
-class FetchResult:
-    ticker: str
-    df: pd.DataFrame
-    source: str
-    from_cache: bool = False
 
 
 class MarketDataProvider(ABC):

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, date
+from datetime import datetime, date
 from typing import Sequence
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
-from TSXPulse.timeutil import utcnow
 from TSXPulse.storage.models import (
     DailyPerformance,
     DiscoverySignal,
@@ -29,11 +28,6 @@ def open_positions(session: Session) -> Sequence[Position]:
     return session.scalars(stmt).all()
 
 
-def positions_for_ticker_open(session: Session, ticker: str) -> Sequence[Position]:
-    stmt = select(Position).where(Position.ticker == ticker, Position.status == "open")
-    return session.scalars(stmt).all()
-
-
 def signals_today(session: Session) -> int:
     start = datetime.combine(date.today(), datetime.min.time())
     stmt = select(func.count(Signal.id)).where(
@@ -47,15 +41,6 @@ def record_health(session: Session, component: str, status: str, message: str = 
     entry = HealthLog(component=component, status=status, message=message)
     session.add(entry)
     session.commit()
-
-
-def recent_health_failures(session: Session, hours: int = 24) -> int:
-    cutoff = utcnow() - timedelta(hours=hours)
-    stmt = select(func.count(HealthLog.id)).where(
-        HealthLog.ts >= cutoff,
-        HealthLog.status.in_(("warn", "error")),
-    )
-    return int(session.scalar(stmt) or 0)
 
 
 def upsert_daily_performance(session: Session, perf: DailyPerformance) -> None:
@@ -77,16 +62,3 @@ def save_discovery_signal(session: Session, sig: DiscoverySignal) -> DiscoverySi
     session.commit()
     session.refresh(sig)
     return sig
-
-
-def latest_discovery_cycle(session: Session) -> Sequence[DiscoverySignal]:
-    """Return all signals from the most recent discovery cycle, ordered by rank."""
-    latest_cycle = session.scalar(
-        select(DiscoverySignal.cycle_id).order_by(DiscoverySignal.generated_at.desc()).limit(1)
-    )
-    if latest_cycle is None:
-        return []
-    stmt = (
-        select(DiscoverySignal).where(DiscoverySignal.cycle_id == latest_cycle).order_by(DiscoverySignal.rank)
-    )
-    return session.scalars(stmt).all()

@@ -133,11 +133,6 @@ def load_env(path: Path | str | None = None) -> None:
         load_dotenv(env_path)
 
 
-def get_discord_webhook_url(cfg: AppConfig) -> str | None:
-    load_env()
-    return os.getenv(cfg.discord.webhook_url_env)
-
-
 def live_trading_enabled() -> bool:
     load_env()
     return os.getenv("ENABLE_LIVE_TRADING", "0") == "1"
