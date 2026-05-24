@@ -19,6 +19,7 @@ from TSXPulse.config import PROJECT_ROOT, AppConfig
 from TSXPulse.data.provider_base import build_provider
 from TSXPulse.execution.broker_base import Broker, Fill
 from TSXPulse.execution.factory import build_broker
+from TSXPulse.discovery.news import NewsFetcher
 from TSXPulse.notifications.discord import DiscordNotifier
 from TSXPulse.notifications.templates import buy_embed, health_alert_embed
 from TSXPulse.risk.rules import filter_signal
@@ -68,6 +69,7 @@ def run_cycle(cfg: AppConfig, force: bool = False) -> CycleReport:
     strategies = build_enabled_strategies(cfg)
     broker: Broker = build_broker(cfg)
     notifier = DiscordNotifier(cfg)
+    news_fetcher = NewsFetcher(max_results=3, days_back=7)
 
     db_path = PROJECT_ROOT / "data" / "TSXPulse.db"
     SessionFactory = get_session_factory(db_path)
@@ -128,7 +130,8 @@ def run_cycle(cfg: AppConfig, force: bool = False) -> CycleReport:
                     continue
 
                 if sig.action == "BUY":
-                    notifier.send_embed(buy_embed(sig, decision.qty, broker.mode))
+                    news = news_fetcher.fetch(ticker) if news_fetcher.is_available() else None
+                    notifier.send_embed(buy_embed(sig, decision.qty, broker.mode, news=news))
                 report.dispatched += 1
 
         record_health(session, "orchestrator", "ok",

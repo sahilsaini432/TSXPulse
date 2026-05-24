@@ -101,6 +101,19 @@ discovery:
 
 **Scheduling discovery:** Add a Windows Task Scheduler entry for `scripts/run_discovery.py` at ~08:30 ET on weekdays. See `scripts/tasks/INSTALL.md` for the schtasks pattern (clone the existing PreOpen entry, swap the script path).
 
+## Discord notifications
+
+Six embed types are posted to your webhook:
+
+| Embed | Colour | When sent |
+|---|---|---|
+| **BUY signal** | Green | Strategy pipeline fires a buy — shows entry, target (+X%), stop (-X%), qty, estimated cost, strategy, confidence, broker mode |
+| **TARGET HIT** | Blue | EOD reconciler closes a position at take-profit — shows entry vs exit, qty, P&L |
+| **STOP HIT** | Red | EOD reconciler closes a position at stop-loss — same fields, includes "Review strategy edge" note |
+| **Daily Summary** | White | EOD recap — realized P&L, unrealized P&L, open positions, signals generated/filled, 30-day win rate |
+| **Discovery Summary** | Purple | One message per discovery cycle listing all ranked picks — entry range, stop, target, R:R ratio, confidence, Claude's rationale, catalyst summary (if news was fetched). Footer: "For manual review only — not trade instructions." |
+| **Health Alert** | Orange | Any unhandled error in either pipeline — component name + error message |
+
 ## Scheduling (Windows)
 
 See `scripts/tasks/INSTALL.md` for `schtasks.exe` commands that register:

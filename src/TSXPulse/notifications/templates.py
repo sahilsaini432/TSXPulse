@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from discord_webhook import DiscordEmbed
 
+from TSXPulse.discovery.news import TickerNews
 from TSXPulse.strategies.base import Signal
 from TSXPulse.timeutil import utcnow
 
@@ -17,7 +20,18 @@ def _now_utc() -> str:
     return utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
 
-def buy_embed(signal: Signal, qty: int, broker_mode: str) -> DiscordEmbed:
+def _format_news_field(news: TickerNews, max_items: int = 3, max_snippet: int = 120) -> str:
+    if news.error or not news.items:
+        return ""
+    lines = []
+    for item in news.items[:max_items]:
+        domain = urlparse(item.url).netloc.removeprefix("www.")
+        snippet = (item.snippet or "").replace("\n", " ")[:max_snippet]
+        lines.append(f"**[{item.title.strip()}]({item.url})**\n{snippet}… _{domain}_")
+    return "\n\n".join(lines)
+
+
+def buy_embed(signal: Signal, qty: int, broker_mode: str, news: TickerNews | None = None) -> DiscordEmbed:
     target_pct = (signal.target_price / signal.entry_price - 1) * 100
     stop_pct = (signal.stop_loss / signal.entry_price - 1) * 100
     est_cost = signal.entry_price * qty
@@ -37,6 +51,10 @@ def buy_embed(signal: Signal, qty: int, broker_mode: str) -> DiscordEmbed:
     embed.add_embed_field(name="Confidence", value=f"{signal.confidence:.0%}", inline=True)
     embed.add_embed_field(name="Session (UTC)", value=_now_utc(), inline=True)
     embed.add_embed_field(name="Mode", value=broker_mode, inline=True)
+    if news:
+        news_text = _format_news_field(news)
+        if news_text:
+            embed.add_embed_field(name="Recent News", value=news_text[:1024], inline=False)
     footer = (
         "Execute manually in your broker." if broker_mode == "manual" else f"Simulated fill ({broker_mode})."
     )
