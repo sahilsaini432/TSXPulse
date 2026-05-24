@@ -69,7 +69,7 @@ discovery:
   # LLM-driven TSX Composite discovery pipeline. Parallel to strategies — runs
   # via scripts/run_discovery.py, NOT via run_cycle.py. Set enabled: true after
   # populating ANTHROPIC_API_KEY and TAVILY_API_KEY in .env.
-  enabled: false
+  enabled: true
   model: claude-sonnet-4-6 # or claude-opus-4-7 (slower, higher quality)
   max_universe: 225 # how many tickers to fetch from XIC holdings
   max_candidates: 50 # top-N from screener forwarded to ranker

@@ -88,7 +88,7 @@ class LoggingConfig(BaseModel):
 class DiscoveryConfig(BaseModel):
     """LLM-driven TSX Composite discovery pipeline (parallel to strategies)."""
 
-    enabled: bool = False
+    enabled: bool = True
     model: str = "claude-sonnet-4-6"
     max_universe: int = Field(225, ge=10, le=300)  # cap on tickers to fetch from universe
     max_candidates: int = Field(50, ge=5, le=100)  # top-N from screener that go to ranker
