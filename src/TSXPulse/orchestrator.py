@@ -131,7 +131,7 @@ def run_cycle(cfg: AppConfig, force: bool = False) -> CycleReport:
 
                 if sig.action == "BUY":
                     news = news_fetcher.fetch(ticker) if news_fetcher.is_available() else None
-                    notifier.send_embed(buy_embed(sig, decision.qty, broker.mode, news=news))
+                    notifier.send_embed(buy_embed(sig, broker.mode, news=news))
                 report.dispatched += 1
 
         record_health(session, "orchestrator", "ok",

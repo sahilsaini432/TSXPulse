@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from discord_webhook import DiscordEmbed
 
-from TSXPulse.discovery.news import TickerNews
 from TSXPulse.strategies.base import Signal
+
+if TYPE_CHECKING:
+    from TSXPulse.discovery.news import TickerNews
 from TSXPulse.timeutil import utcnow
 
 COLOR_BUY = "00C853"  # green
@@ -31,10 +34,9 @@ def _format_news_field(news: TickerNews, max_items: int = 3, max_snippet: int = 
     return "\n\n".join(lines)
 
 
-def buy_embed(signal: Signal, qty: int, broker_mode: str, news: TickerNews | None = None) -> DiscordEmbed:
+def buy_embed(signal: Signal, broker_mode: str, news: TickerNews | None = None) -> DiscordEmbed:
     target_pct = (signal.target_price / signal.entry_price - 1) * 100
     stop_pct = (signal.stop_loss / signal.entry_price - 1) * 100
-    est_cost = signal.entry_price * qty
     embed = DiscordEmbed(
         title=f"BUY {signal.ticker}",
         description=signal.reasoning or "New buy signal.",
@@ -45,18 +47,16 @@ def buy_embed(signal: Signal, qty: int, broker_mode: str, news: TickerNews | Non
         name="Target", value=f"${signal.target_price:,.2f} ({target_pct:+.1f}%)", inline=True
     )
     embed.add_embed_field(name="Stop", value=f"${signal.stop_loss:,.2f} ({stop_pct:+.1f}%)", inline=True)
-    embed.add_embed_field(name="Qty", value=f"{qty}", inline=True)
-    embed.add_embed_field(name="Est. Cost", value=f"${est_cost:,.0f}", inline=True)
     embed.add_embed_field(name="Strategy", value=signal.strategy_name, inline=True)
     embed.add_embed_field(name="Confidence", value=f"{signal.confidence:.0%}", inline=True)
-    embed.add_embed_field(name="Session (UTC)", value=_now_utc(), inline=True)
-    embed.add_embed_field(name="Mode", value=broker_mode, inline=True)
     if news:
         news_text = _format_news_field(news)
         if news_text:
             embed.add_embed_field(name="Recent News", value=news_text[:1024], inline=False)
     footer = (
-        "Execute manually in your broker." if broker_mode == "manual" else f"Simulated fill ({broker_mode})."
+        f"Execute manually in your broker. [{broker_mode}] {_now_utc()}"
+        if broker_mode == "manual"
+        else f"Simulated fill. [{broker_mode}] {_now_utc()}"
     )
     embed.set_footer(text=footer)
     return embed
@@ -105,11 +105,15 @@ def daily_summary_embed(
         description=utcnow().strftime("%A, %Y-%m-%d"),
         color=COLOR_SUMMARY,
     )
-    embed.add_embed_field(name="Realized P&L", value=f"${realized_pnl:+,.2f}", inline=True)
-    embed.add_embed_field(name="Unrealized P&L", value=f"${unrealized_pnl:+,.2f}", inline=True)
+    embed.add_embed_field(
+        name="P&L",
+        value=f"${realized_pnl:+,.2f} realized / ${unrealized_pnl:+,.2f} unrealized",
+        inline=False,
+    )
     embed.add_embed_field(name="Open Positions", value=str(open_positions), inline=True)
-    embed.add_embed_field(name="Signals Generated", value=str(signals_generated), inline=True)
-    embed.add_embed_field(name="Signals Filled", value=str(signals_filled), inline=True)
+    embed.add_embed_field(
+        name="Signals", value=f"{signals_filled}/{signals_generated} filled", inline=True
+    )
     wr = f"{win_rate_30d:.0%}" if win_rate_30d is not None else "n/a"
     embed.add_embed_field(name="30d Win Rate", value=wr, inline=True)
     embed.set_footer(text=_now_utc())
@@ -126,11 +130,19 @@ def health_alert_embed(component: str, status: str, message: str) -> DiscordEmbe
     return embed
 
 
+def _format_sources_line(news: TickerNews, max_items: int = 3) -> str:
+    if news.error or not news.items:
+        return ""
+    parts = [f"[{item.title.strip()}]({item.url})" for item in news.items[:max_items]]
+    return "Sources: " + " · ".join(parts)
+
+
 def discovery_summary_embed(
     signals: list,
     model: str,
     universe_size: int,
     screened: int,
+    news_by_ticker: dict | None = None,
 ) -> DiscordEmbed:
     """One compact embed listing all ranked discovery signals.
 
@@ -151,13 +163,20 @@ def discovery_summary_embed(
         r_to_target = sig.target - ((sig.entry_low + sig.entry_high) / 2)
         r_to_stop = ((sig.entry_low + sig.entry_high) / 2) - sig.stop
         rr = r_to_target / r_to_stop if r_to_stop > 0 else 0.0
-        catalyst = f"\n  • Catalyst: {sig.catalyst_summary}" if sig.catalyst_summary else ""
+        catalyst = f" | Catalyst: {sig.catalyst_summary}" if sig.catalyst_summary else ""
+        sources = ""
+        if news_by_ticker:
+            ticker_news = news_by_ticker.get(sig.ticker)
+            if ticker_news:
+                sources_line = _format_sources_line(ticker_news)
+                if sources_line:
+                    sources = f"\n{sources_line}"
         # Discord limits: each field value max 1024 chars; description 4096; embed total 6000
         value = (
             f"Entry **{entry_range}** | Stop **${sig.stop:.2f}** | "
             f"Target **${sig.target:.2f}** (R:R {rr:.1f})\n"
-            f"Confidence **{sig.confidence:.0%}**\n"
-            f"_{sig.rationale}_{catalyst}"
+            f"Confidence **{sig.confidence:.0%}**{catalyst}\n"
+            f"_{sig.rationale}_{sources}"
         )[:1024]
         embed.add_embed_field(name=f"#{sig.rank}  {sig.ticker}", value=value, inline=False)
 
