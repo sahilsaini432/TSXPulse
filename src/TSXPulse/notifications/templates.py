@@ -12,11 +12,25 @@ if TYPE_CHECKING:
 from TSXPulse.timeutil import utcnow
 
 COLOR_BUY = "00C853"  # green
+COLOR_SELL = "D32F2F"  # red
 COLOR_TARGET = "2979FF"  # blue
 COLOR_STOP = "D32F2F"  # red
 COLOR_SUMMARY = "FFFFFF"  # white
 COLOR_HEALTH = "FF9100"  # orange
 COLOR_DISCOVERY = "9C27B0"  # purple — visually distinct from strategy signals
+
+_SIGNAL_META: dict[str, dict] = {
+    "BUY": {
+        "color": COLOR_BUY,
+        "title_prefix": "📈 BUY Signals",
+        "description": "Potential stocks to buy — bullish technical setups passing all risk filters.",
+    },
+    "SELL": {
+        "color": COLOR_SELL,
+        "title_prefix": "📉 SELL Signals",
+        "description": "Stocks showing bearish or exit conditions — consider reducing or closing positions.",
+    },
+}
 
 
 def _now_utc() -> str:
@@ -32,6 +46,62 @@ def _format_news_field(news: TickerNews, max_items: int = 3, max_snippet: int = 
         snippet = (item.snippet or "").replace("\n", " ")[:max_snippet]
         lines.append(f"**[{item.title.strip()}]({item.url})**\n{snippet}… _{domain}_")
     return "\n\n".join(lines)
+
+
+def grouped_signals_embed(
+    action: str,
+    signals: list[Signal],
+    broker_mode: str,
+) -> DiscordEmbed:
+    """One embed per signal type, with a table of all tickers that triggered it."""
+    meta = _SIGNAL_META.get(action, _SIGNAL_META["BUY"])
+    n = len(signals)
+    embed = DiscordEmbed(
+        title=f"{meta['title_prefix']} ({n} ticker{'s' if n != 1 else ''})",
+        description=meta["description"],
+        color=meta["color"],
+    )
+
+    # Columns sized to fit Discord's ~55-char code block width
+    header = f"{'Ticker':<8} {'Entry':>8} {'Target':>8} {'Stop':>8} {'Strat':<9} {'Cf':>3}"
+    sep    = f"{'-'*8} {'-'*8} {'-'*8} {'-'*8} {'-'*9} {'-'*3}"
+    rows = [header, sep]
+    for sig in signals:
+        strat = sig.strategy_name[:9]
+        rows.append(
+            f"{sig.ticker:<8} "
+            f"${sig.entry_price:>7,.2f} "
+            f"${sig.target_price:>7,.2f} "
+            f"${sig.stop_loss:>7,.2f} "
+            f"{strat:<9} "
+            f"{sig.confidence:>3.0%}"
+        )
+
+    table_body = "\n".join(rows)
+    # Discord field value limit is 1024 chars; truncate with a trailer if needed
+    code_block = f"```\n{table_body}\n```"
+    if len(code_block) > 1024:
+        max_rows = 1024 - len(f"```\n{header}\n{sep}\n… (+N more)\n```") - 10
+        kept_rows = []
+        used = 0
+        for row in rows[2:]:
+            if used + len(row) + 1 > max_rows:
+                break
+            kept_rows.append(row)
+            used += len(row) + 1
+        skipped = len(signals) - len(kept_rows)
+        table_body = "\n".join([header, sep] + kept_rows + [f"… (+{skipped} more)"])
+        code_block = f"```\n{table_body}\n```"
+
+    embed.add_embed_field(name="Signals", value=code_block, inline=False)
+
+    footer = (
+        f"Execute manually in your broker. [{broker_mode}] {_now_utc()}"
+        if broker_mode == "manual"
+        else f"Simulated fill. [{broker_mode}] {_now_utc()}"
+    )
+    embed.set_footer(text=footer)
+    return embed
 
 
 def buy_embed(signal: Signal, broker_mode: str, news: TickerNews | None = None) -> DiscordEmbed:
@@ -66,7 +136,7 @@ def exit_target_embed(ticker: str, entry: float, exit_price: float, qty: int, pn
     pct = (exit_price / entry - 1) * 100
     embed = DiscordEmbed(
         title=f"TARGET HIT — {ticker}",
-        description=f"Take-profit filled.",
+        description="Take-profit level reached — position closed at target price. Consider reinvesting the gain.",
         color=COLOR_TARGET,
     )
     embed.add_embed_field(name="Entry", value=f"${entry:,.2f}", inline=True)
@@ -81,7 +151,7 @@ def stop_loss_embed(ticker: str, entry: float, exit_price: float, qty: int, pnl:
     pct = (exit_price / entry - 1) * 100
     embed = DiscordEmbed(
         title=f"STOP HIT — {ticker}",
-        description="Stop-loss filled. Review strategy edge.",
+        description="Stop-loss triggered — position closed to limit downside. Review the setup before re-entering.",
         color=COLOR_STOP,
     )
     embed.add_embed_field(name="Entry", value=f"${entry:,.2f}", inline=True)
@@ -102,7 +172,7 @@ def daily_summary_embed(
 ) -> DiscordEmbed:
     embed = DiscordEmbed(
         title="Daily Summary",
-        description=utcnow().strftime("%A, %Y-%m-%d"),
+        description=f"End-of-day performance recap for {utcnow().strftime('%A, %Y-%m-%d')}.",
         color=COLOR_SUMMARY,
     )
     embed.add_embed_field(

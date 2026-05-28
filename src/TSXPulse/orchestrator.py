@@ -6,12 +6,13 @@ run_cycle():
   3. Persist Signal rows (status=new).
   4. risk.rules.filter_signal() decides accept/reject.
   5. Dispatch accepted signals to broker.execute_trade().
-  6. Send Discord BUY embed for filled BUY signals.
+  6. After all tickers processed, send one grouped Discord embed per signal type.
   7. Record health entry.
 """
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 
 from TSXPulse.calendar_util import is_trading_day
@@ -19,9 +20,8 @@ from TSXPulse.config import PROJECT_ROOT, AppConfig
 from TSXPulse.data.provider_base import build_provider
 from TSXPulse.execution.broker_base import Broker, Fill
 from TSXPulse.execution.factory import build_broker
-from TSXPulse.discovery.news import NewsFetcher
 from TSXPulse.notifications.discord import DiscordNotifier
-from TSXPulse.notifications.templates import buy_embed, health_alert_embed
+from TSXPulse.notifications.templates import grouped_signals_embed, health_alert_embed
 from TSXPulse.risk.rules import filter_signal
 from TSXPulse.storage.models import Signal as SignalModel
 from TSXPulse.storage.models import get_session_factory
@@ -69,7 +69,6 @@ def run_cycle(cfg: AppConfig, force: bool = False) -> CycleReport:
     strategies = build_enabled_strategies(cfg)
     broker: Broker = build_broker(cfg)
     notifier = DiscordNotifier(cfg)
-    news_fetcher = NewsFetcher(max_results=3, days_back=7)
 
     db_path = PROJECT_ROOT / "data" / "TSXPulse.db"
     SessionFactory = get_session_factory(db_path)
@@ -88,6 +87,8 @@ def run_cycle(cfg: AppConfig, force: bool = False) -> CycleReport:
             record_health(s, "data_provider", "error", str(e))
         report.errors += 1
         return report
+
+    dispatched_signals: list[Signal] = []
 
     with SessionFactory() as session:
         for ticker in cfg.watchlist:
@@ -129,10 +130,16 @@ def run_cycle(cfg: AppConfig, force: bool = False) -> CycleReport:
                     report.rejected += 1
                     continue
 
-                if sig.action == "BUY":
-                    news = news_fetcher.fetch(ticker) if news_fetcher.is_available() else None
-                    notifier.send_embed(buy_embed(sig, broker.mode, news=news))
+                dispatched_signals.append(sig)
                 report.dispatched += 1
+
+        # Send one grouped embed per signal type after all tickers are processed
+        by_action: dict[str, list[Signal]] = defaultdict(list)
+        for s in dispatched_signals:
+            by_action[s.action].append(s)
+        for action, sigs in by_action.items():
+            if action in ("BUY", "SELL"):
+                notifier.send_embed(grouped_signals_embed(action, sigs, broker.mode))
 
         record_health(session, "orchestrator", "ok",
                       f"eval={report.evaluated_tickers} sigs={report.raw_signals} "

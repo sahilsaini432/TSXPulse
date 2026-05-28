@@ -17,7 +17,7 @@ from TSXPulse.logging_setup import setup_logging
 from TSXPulse.notifications.discord import DiscordNotifier
 from TSXPulse.timeutil import utcnow
 from TSXPulse.notifications.templates import (
-    buy_embed,
+    grouped_signals_embed,
     daily_summary_embed,
     exit_target_embed,
     health_alert_embed,
@@ -31,19 +31,32 @@ def main() -> int:
     setup_logging(cfg)
     notifier = DiscordNotifier(cfg)
 
-    sample = Signal(
-        ticker="RY.TO",
-        action="BUY",
-        entry_price=245.85,
-        target_price=270.44,
-        stop_loss=233.56,
-        confidence=0.72,
-        reasoning="RSI(14) crossed up through 30 (28.1 -> 31.4); oversold bounce.",
-        strategy_name="mean_reversion",
-        generated_at=utcnow(),
-    )
+    samples = [
+        Signal(
+            ticker="RY.TO",
+            action="BUY",
+            entry_price=245.85,
+            target_price=270.44,
+            stop_loss=233.56,
+            confidence=0.72,
+            reasoning="RSI(14) crossed up through 30 (28.1 -> 31.4); oversold bounce.",
+            strategy_name="mean_reversion",
+            generated_at=utcnow(),
+        ),
+        Signal(
+            ticker="TD.TO",
+            action="BUY",
+            entry_price=82.30,
+            target_price=90.53,
+            stop_loss=78.19,
+            confidence=0.65,
+            reasoning="RSI(14) = 28.7; mean-reversion setup.",
+            strategy_name="mean_reversion",
+            generated_at=utcnow(),
+        ),
+    ]
 
-    notifier.send_embed(buy_embed(sample, qty=2, broker_mode=cfg.broker.mode))
+    notifier.send_embed(grouped_signals_embed("BUY", samples, broker_mode=cfg.broker.mode))
     notifier.send_embed(exit_target_embed("TD.TO", entry=145.41, exit_price=159.95, qty=3, pnl=43.62))
     notifier.send_embed(stop_loss_embed("BCE.TO", entry=32.72, exit_price=31.08, qty=15, pnl=-24.60))
     notifier.send_embed(
