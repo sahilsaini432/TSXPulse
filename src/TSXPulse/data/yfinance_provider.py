@@ -5,6 +5,7 @@ import time
 from datetime import timedelta
 
 from TSXPulse.timeutil import utcnow
+from TSXPulse.calendar_util import is_market_open
 from pathlib import Path
 
 import pandas as pd
@@ -56,7 +57,7 @@ class YFinanceProvider(MarketDataProvider):
     def fetch_ohlcv(self, ticker: str, lookback_days: int) -> pd.DataFrame:
         cached = self._read_cache(ticker)
         if cached is not None and len(cached) >= lookback_days:
-            return cached.tail(lookback_days)
+            return self._patch_live_price(ticker, cached.tail(lookback_days))
 
         backoff_max = max(self.cfg.data.retry_backoff_seconds) if self.cfg.data.retry_backoff_seconds else 8.0
 
@@ -95,6 +96,20 @@ class YFinanceProvider(MarketDataProvider):
 
         df = _fetch()
         self._write_cache(ticker, df)
+        return self._patch_live_price(ticker, df)
+
+    def _patch_live_price(self, ticker: str, df: pd.DataFrame) -> pd.DataFrame:
+        """If the market is open, overwrite the last close with the current live price."""
+        if not is_market_open():
+            return df
+        try:
+            live = yf.Ticker(ticker).fast_info["last_price"]
+            if live and live > 0:
+                df = df.copy()
+                df.iloc[-1, df.columns.get_loc("close")] = float(live)
+                log.debug("Live price patch: %s close -> %.4f", ticker, live)
+        except Exception as e:
+            log.warning("Live price fetch failed for %s: %s", ticker, e)
         return df
 
     def fetch_batch(self, tickers: list[str], lookback_days: int) -> dict[str, pd.DataFrame]:

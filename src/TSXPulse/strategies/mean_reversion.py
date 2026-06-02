@@ -54,8 +54,8 @@ class MeanReversionRSI(Strategy):
                 ticker=ticker,
                 action="SELL",
                 entry_price=last_close,
-                target_price=last_close,
-                stop_loss=last_close,
+                target_price=last_close * (1 - self.take_profit_pct),
+                stop_loss=last_close * (1 + self.stop_loss_pct),
                 confidence=0.6,
                 reasoning=(
                     f"RSI({self.period}) crossed down through {self.sell_above} "

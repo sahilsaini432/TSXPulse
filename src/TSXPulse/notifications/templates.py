@@ -23,14 +23,27 @@ _SIGNAL_META: dict[str, dict] = {
     "BUY": {
         "color": COLOR_BUY,
         "title_prefix": "📈 BUY Signals",
-        "description": "Potential stocks to buy — bullish technical setups passing all risk filters.",
+        "description": (
+            "The system thinks these stocks are good to **buy right now**. "
+            "They passed all safety checks and show a strong technical setup."
+        ),
     },
     "SELL": {
         "color": COLOR_SELL,
         "title_prefix": "📉 SELL Signals",
-        "description": "Stocks showing bearish or exit conditions — consider reducing or closing positions.",
+        "description": (
+            "These stocks look like they may have peaked or are losing momentum. "
+            "If you own any of them, consider **selling to lock in gains or cut losses**."
+        ),
     },
 }
+
+_COLUMN_LEGEND = (
+    "**Entry** = price to buy/sell at now  ·  "
+    "**Target** = price to take profit  ·  "
+    "**Stop** = price to exit if trade goes wrong  ·  "
+    "**Cf** = system confidence"
+)
 
 
 def _now_utc() -> str:
@@ -94,6 +107,7 @@ def grouped_signals_embed(
         code_block = f"```\n{table_body}\n```"
 
     embed.add_embed_field(name="Signals", value=code_block, inline=False)
+    embed.add_embed_field(name="Column Guide", value=_COLUMN_LEGEND, inline=False)
 
     footer = (
         f"Execute manually in your broker. [{broker_mode}] {_now_utc()}"
@@ -136,7 +150,7 @@ def exit_target_embed(ticker: str, entry: float, exit_price: float, qty: int, pn
     pct = (exit_price / entry - 1) * 100
     embed = DiscordEmbed(
         title=f"TARGET HIT — {ticker}",
-        description="Take-profit level reached — position closed at target price. Consider reinvesting the gain.",
+        description="The stock hit your profit target — the position was closed. You made money on this trade! 🎯",
         color=COLOR_TARGET,
     )
     embed.add_embed_field(name="Entry", value=f"${entry:,.2f}", inline=True)
@@ -151,7 +165,7 @@ def stop_loss_embed(ticker: str, entry: float, exit_price: float, qty: int, pnl:
     pct = (exit_price / entry - 1) * 100
     embed = DiscordEmbed(
         title=f"STOP HIT — {ticker}",
-        description="Stop-loss triggered — position closed to limit downside. Review the setup before re-entering.",
+        description="The stock dropped to your stop price — the position was closed to prevent further losses. Review before re-entering.",
         color=COLOR_STOP,
     )
     embed.add_embed_field(name="Entry", value=f"${entry:,.2f}", inline=True)
@@ -200,19 +214,11 @@ def health_alert_embed(component: str, status: str, message: str) -> DiscordEmbe
     return embed
 
 
-def _format_sources_line(news: TickerNews, max_items: int = 3) -> str:
-    if news.error or not news.items:
-        return ""
-    parts = [f"[{item.title.strip()}]({item.url})" for item in news.items[:max_items]]
-    return "Sources: " + " · ".join(parts)
-
-
 def discovery_summary_embed(
     signals: list,
     model: str,
     universe_size: int,
     screened: int,
-    news_by_ticker: dict | None = None,
 ) -> DiscordEmbed:
     """One compact embed listing all ranked discovery signals.
 
@@ -228,26 +234,23 @@ def discovery_summary_embed(
         color=COLOR_DISCOVERY,
     )
 
+    # Discord hard limit: 6000 chars total across all embed text.
+    # With up to top_n signals, budget ~700 chars per field to stay safe.
+    per_field_budget = max(300, (5500 - 250) // max(len(signals), 1))
+
     for sig in signals:
         entry_range = f"${sig.entry_low:.2f} – ${sig.entry_high:.2f}"
         r_to_target = sig.target - ((sig.entry_low + sig.entry_high) / 2)
         r_to_stop = ((sig.entry_low + sig.entry_high) / 2) - sig.stop
         rr = r_to_target / r_to_stop if r_to_stop > 0 else 0.0
-        catalyst = f" | Catalyst: {sig.catalyst_summary}" if sig.catalyst_summary else ""
-        sources = ""
-        if news_by_ticker:
-            ticker_news = news_by_ticker.get(sig.ticker)
-            if ticker_news:
-                sources_line = _format_sources_line(ticker_news)
-                if sources_line:
-                    sources = f"\n{sources_line}"
-        # Discord limits: each field value max 1024 chars; description 4096; embed total 6000
+        rationale = (sig.rationale or "")[:200]
+        catalyst = f" | {sig.catalyst_summary[:80]}" if sig.catalyst_summary else ""
         value = (
             f"Entry **{entry_range}** | Stop **${sig.stop:.2f}** | "
             f"Target **${sig.target:.2f}** (R:R {rr:.1f})\n"
             f"Confidence **{sig.confidence:.0%}**{catalyst}\n"
-            f"_{sig.rationale}_{sources}"
-        )[:1024]
+            f"_{rationale}_"
+        )[:per_field_budget]
         embed.add_embed_field(name=f"#{sig.rank}  {sig.ticker}", value=value, inline=False)
 
     embed.set_footer(text=f"Discovery • {_now_utc()}")

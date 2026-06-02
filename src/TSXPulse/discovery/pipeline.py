@@ -250,7 +250,6 @@ def run_discovery(
             model=ranker_result.model,
             universe_size=report.universe_size,
             screened=report.screened,
-            news_by_ticker=news_by_ticker,
         )
         report.posted_to_discord = notifier.send_embed(embed)
 

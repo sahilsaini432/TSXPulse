@@ -262,7 +262,7 @@ schedule:
   respect_tsx_holidays: true
 
 broker:
-  mode: paper # manual | paper | ibkr
+  mode: manual # manual | paper | ibkr
   paper_slippage_pct: 0.001
 
 discord:
